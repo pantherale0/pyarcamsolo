@@ -452,6 +452,10 @@ class ArcamSolo:
 
     async def turn_on(self):
         """Turn the unit on."""
+        # send the command twice as sometimes the device doesn't respond
+        await self.send_ir_command(
+            command="standby_off"
+        )
         await self.send_ir_command(
             command="standby_off"
         )
