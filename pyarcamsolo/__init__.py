@@ -55,6 +55,7 @@ class ArcamSolo:
 
         # Data
         self.zones = {}
+        self._zone_callbacks = {}
 
         # Locks
         self._connect_lock = asyncio.Lock()
@@ -80,7 +81,6 @@ class ArcamSolo:
         self._initial_query = True
         # Stores a list of commands to run after receiving an event
         self._command_queue = []
-        self._power_zone_1 = None
 
     def __del__(self):
         _LOGGER.debug(">> ArcamSolo.__del__()")
@@ -93,6 +93,27 @@ class ArcamSolo:
             interval_sec=int(self._timeout),
             max_fails=3,
         )
+
+    def set_zone_callback(
+        self, zone: int, callback: Callable[..., None] | None = None
+    ):
+        """Configure a zone callback."""
+        if zone in self.zones:
+            if callback:
+                self._zone_callbacks[zone] = callback
+            else:
+                self._zone_callbacks.pop(zone)
+
+    def _clear_zone_callbacks(self):
+        """Clear any configured zone callbacks."""
+        self._zone_callbacks = {}
+
+    def _call_zone_callbacks(self, zone: int):
+        """Call a configured callback."""
+        if zone in self._zone_callbacks:
+            callback = self._zone_callbacks[zone]
+            if callback:
+                callback()
 
     @property
     def get_unique_id(self):
@@ -127,6 +148,7 @@ class ArcamSolo:
                     if value["z"] not in self.zones:
                         self.zones[value["z"]] = {}
                     self.zones[value["z"]][value["k"]] = value["v"]
+                    self._call_zone_callbacks(zone=value["z"])
             except asyncio.CancelledError:
                 _LOGGER.debug((">> ArcamSolo._connection_listener() cancelled"))
                 running = False
@@ -221,6 +243,8 @@ class ArcamSolo:
         async with self._disconnect_lock:
             _LOGGER.debug("disconnecting Arcam connection")
             self.available = False
+            for zone in self.zones:
+                self._call_zone_callbacks(zone)
 
             await self._listener_cancel()
             await self._responder_cancel()
