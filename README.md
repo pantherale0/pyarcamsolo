@@ -14,6 +14,10 @@ Based on the implementation of [aiopioneer](https://github.com/crowbarz/aiopione
 - Supports sending custom IR commands
 - Automatically sets the time on startup (if still supported by your software version)
 
+## Important notes
+
+- The documentation appears to be different to what is supported on some units, if your software version is 2.7 or lower (you can check in the engineering menu), you will need to use a baudrate of 38400 (8n1).
+
 ## Source list
 
 | ID | Name
