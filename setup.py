@@ -31,7 +31,7 @@ DEV_REQUIREMENTS = [
 setuptools.setup(
     name='pyarcamsolo',
     version=version,
-    description='A generic library to collect fuel prices of fuel stations around the world!',
+    description='Asyncio Python library for controlling Arcam Solo Hi-Fi devices via RS232 ser2net bridge.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='http://github.com/pantherale0/pyarcamsolo',
@@ -44,6 +44,10 @@ setuptools.setup(
         ]
     },
     classifiers=[
+        "Framework :: AsyncIO",
+        "Intended Audience :: Developers",
+        "Topic :: Home Automation",
+        "Topic :: Software Development :: Libraries :: Python Modules",
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
