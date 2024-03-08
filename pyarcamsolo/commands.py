@@ -1,19 +1,5 @@
 """Arcam Solo commands."""
 
-ARCAM_QUERY_COMMANDS = [
-    "software_version",
-    "rs232_version",
-    "status",
-    "source",
-    "volume",
-    "balance",
-    "bass",
-    "treble",
-    "mute",
-    "display_brightness",
-    "stby_display_brightness"
-]
-
 ARCAM_COMM_START = b'\x21'
 ARCAM_COMM_END = b'\x0D'
 
@@ -53,6 +39,8 @@ COMMAND_CODES = {
     "rs232_version": b'\xF1',
     "software_version": b'\xF2'
 }
+
+ARCAM_QUERY_COMMANDS = list(COMMAND_CODES.keys())
 
 ACCEPTED_ANSWER_CODES = ["status_update", "command_accepted_completed"]
 ANSWER_CODES = {
