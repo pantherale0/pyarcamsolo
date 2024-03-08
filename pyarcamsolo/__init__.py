@@ -6,6 +6,7 @@ import time
 import logging
 import re
 import math
+import uuid
 
 from datetime import datetime
 from collections.abc import Callable
@@ -96,14 +97,21 @@ class ArcamSolo:
         )
 
     def set_zone_callback(
-        self, zone: int, callback: Callable[..., None] | None = None
-    ):
+        self, zone: int, callback_id: uuid.UUID = None, callback: Callable[..., None] | None = None
+    ) -> uuid.UUID | None:
         """Configure a zone callback."""
         if zone in self.zones:
             if callback:
-                self._zone_callbacks[zone] = callback
+                callback_id = uuid.uuid4()
+                self._zone_callbacks.setdefault(zone, {})
+                self._zone_callbacks[zone][callback_id] = callback
+                return callback_id
+            elif callback_id:
+                self._zone_callbacks[zone].pop(callback_id)
+                return None
             else:
                 self._zone_callbacks.pop(zone)
+                return None
 
     def _clear_zone_callbacks(self):
         """Clear any configured zone callbacks."""
@@ -112,9 +120,10 @@ class ArcamSolo:
     def _call_zone_callbacks(self, zone: int):
         """Call a configured callback."""
         if zone in self._zone_callbacks:
-            callback = self._zone_callbacks[zone]
-            if callback:
-                callback()
+            callbacks = self._zone_callbacks[zone]
+            for k, v in callbacks.items():
+                if v:
+                    v()
 
     @property
     def get_unique_id(self):
