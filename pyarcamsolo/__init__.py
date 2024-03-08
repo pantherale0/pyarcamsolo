@@ -19,7 +19,7 @@ from .commands import (
     SOURCE_IR_CONTROL_MAP,
     ARCAM_QUERY_COMMANDS
 )
-from .util import sock_set_keepalive, cancel_task, get_backoff_delay
+from .util import sock_set_keepalive, cancel_task, get_backoff_delay, safe_wait_for
 from .parser import parse_response
 from ._version import __version__ as VERSION
 
@@ -70,6 +70,7 @@ class ArcamSolo:
         self._reconnect = True
         self._full_update = True
         self._last_command = None
+        self._last_response = None
         self._last_updated = None
         self._reader = None
         self._writer = None
@@ -125,6 +126,14 @@ class ArcamSolo:
         await cancel_task(self._responder_task, "responder")
         self._responder_task = None
 
+    def _set_updated_values(self, value):
+        """Set updated values from response parser."""
+        _LOGGER.debug("parsed response %s", value)
+        if value["z"] not in self.zones:
+            self.zones[value["z"]] = {}
+        self.zones[value["z"]][value["k"]] = value["v"]
+        self._call_zone_callbacks(zone=value["z"])
+
     async def _connection_listener(self):
         """Arcam connection listener. Parse responses and update state."""
         _LOGGER.debug(">> ArcamSolo._connection_listener() started")
@@ -137,18 +146,24 @@ class ArcamSolo:
                     # Connection closed or exception
                     break
                 self._last_updated = time.time()
+                self._last_response = response
                 if not response:
                     # Skip empty response
                     continue
-                _LOGGER.debug("received Arcam response: %s", response.hex())
-                action = " parsing response " + response.hex()
-                value = parse_response(response)
-                if value is not None:
-                    _LOGGER.debug("parsed response %s", value)
-                    if value["z"] not in self.zones:
-                        self.zones[value["z"]] = {}
-                    self.zones[value["z"]][value["k"]] = value["v"]
-                    self._call_zone_callbacks(zone=value["z"])
+                start = response.find(ARCAM_COMM_START)
+                end = response.find(ARCAM_COMM_END)
+                if start >= 0 and end > 0:
+                    response = response[start:end+1]
+                    _LOGGER.debug("received Arcam response: %s", response.hex())
+                    action = " parsing response " + response.hex()
+                    value = parse_response(response)
+                    if isinstance(value, list):
+                        for parsed in value:
+                            self._set_updated_values(parsed)
+                    elif isinstance(value, dict):
+                        self._set_updated_values(value)    
+                else:
+                    _LOGGER.debug("Ignoring response %s due to invalid data.", response.hex())
             except asyncio.CancelledError:
                 _LOGGER.debug((">> ArcamSolo._connection_listener() cancelled"))
                 running = False
@@ -175,6 +190,99 @@ class ArcamSolo:
         """Cancel the listener task."""
         await cancel_task(self._listener_task, "listener")
         self._listener_task = None
+
+    async def _updater_cancel(self):
+        """Cancel the updater task."""
+        await cancel_task(self._updater_task, "updater")
+        self._updater_task = None
+
+    async def _updater(self):
+        """Perform update scan every scan_interval."""
+        event = self._update_event
+        while True:
+            try:
+                event.clear()
+                await self._updater_update()
+                await safe_wait_for(event.wait(), timeout=self.scan_interval)
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                break
+            except Exception as exc: #pylint: disable=broad-except
+                _LOGGER.error(">> ArcamSolo._updater() exception: %s", str(exc))
+                break
+
+    async def _updater_update(self):
+        """Update cached status."""
+        if self._update_lock.locked():
+            _LOGGER.debug("Updates locked, skipping")
+            return False
+        if not self.available:
+            _LOGGER.debug("Device not connected, skipping update.")
+            return False
+
+        _rc = True
+        async with self._update_lock:
+            # Update only if scan interval has passed
+            now = time.time()
+            full_update = self._full_update
+            scan_interval = self.scan_interval
+            since_updated = scan_interval + 1
+            since_updated_str = "never"
+            if self._last_updated:
+                since_updated = now - self._last_updated
+                since_updated_str = f"{since_updated:.3f}s ago"
+            if full_update or not scan_interval or since_updated > scan_interval:
+                _LOGGER.info(
+                    "updating Arcam status (full=%s, last updated %s)",
+                    full_update,
+                    since_updated_str
+                )
+                self._last_updated = now
+                self._full_update = False
+                try:
+                    # update time
+                    await self.send_raw_command(
+                        command="time",
+                        data=[
+                            (datetime.today().weekday()+1).to_bytes(1, 'little'),
+                            datetime.now().hour.to_bytes(1, 'little'),
+                            datetime.now().minute.to_bytes(1, 'little'),
+                            datetime.now().second.to_bytes(1, 'little')
+                        ]
+                    )
+                    for zone in self.zones:
+                        await self._update_zone(zone)
+                except Exception as exc: #pylint: disable=broad-except
+                    _LOGGER.error(
+                        "could not update Arcam status: %s: %s",
+                        type(exc).__name__,
+                        str(exc)
+                    )
+                    _rc = False
+            else:
+                _rc = None
+        if _rc is False:
+            # disconnect on error
+            await self.disconnect()
+        return _rc
+
+    async def _update_zone(self, zone: int):
+        """Update a given zone."""
+        for query in ARCAM_QUERY_COMMANDS:
+            await self.send_raw_command(
+                command=query,
+                data=[b'\xF0'],
+                zone=zone
+            )
+
+    async def _updater_schedule(self):
+        """Schedule/reschedule the updater task."""
+        if self.scan_interval:
+            _LOGGER.debug(">> ArcamSolo._updater_schedule()")
+            await self._updater_cancel()
+            self._full_update = True # always perform a full update on schedule
+            self._updater_task = asyncio.create_task(self._updater())
 
     async def connect(self, reconnect=True):
         """Open a connection to the Hi-Fi and start listener thread."""
@@ -206,24 +314,9 @@ class ArcamSolo:
             await self._responder_cancel()
             await self._listener_schedule()
             await asyncio.sleep(0) # yield to listener task
-
-            # perform initial queries
-            for query in ARCAM_QUERY_COMMANDS:
-                await self.send_raw_command(
-                    command=query,
-                    data=[b'\xF0']
-                )
-
-            # auto set RTC to current time
-            await self.send_raw_command(
-                command="time",
-                data=[
-                    (datetime.today().weekday()+1).to_bytes(1, 'little'),
-                    datetime.now().hour.to_bytes(1, 'little'),
-                    datetime.now().minute.to_bytes(1, 'little'),
-                    datetime.now().second.to_bytes(1, 'little')
-                ]
-            )
+            await self.discover_zones([1, 2]) # discover zone 1 and 2
+            await asyncio.sleep(2)
+            await self._updater_schedule()
 
         _LOGGER.debug(">> ArcamSolo.connect() completed")
 
@@ -389,10 +482,21 @@ class ArcamSolo:
                       raw_response)
         return raw_response
 
+    async def discover_zones(self, zones: list[int]):
+        """Discovers all available zones."""
+        _LOGGER.debug('>> ArcamSolo.discover_zones(zones="%s")', zones)
+        for z in zones:
+            await self.send_raw_command(
+                command="volume",
+                data=[b'\xF0'],
+                zone=z
+            )
+            await asyncio.sleep(0.1) # allow system to respond
+
     async def send_raw_command(self,
                                command: str,
                                data: list[bytes],
-                               zone: bytes=b'\x01',
+                               zone: int=1,
                                rate_limit=True):
         """Send a raw command to the Arcam."""
         _LOGGER.debug(
@@ -414,7 +518,12 @@ class ArcamSolo:
                 _LOGGER.debug("delaying command for %.3f s", delay)
                 await asyncio.sleep(command_delay - since_command)
         raw_command = COMMAND_CODES.get(command)
-        raw_command = ARCAM_COMM_START + zone + raw_command + len(data).to_bytes(1, 'little')
+        raw_command = (
+            ARCAM_COMM_START +
+            zone.to_bytes(1, 'little') +
+            raw_command +
+            len(data).to_bytes(1, 'little')
+        )
         for b in data:
             raw_command += b
         raw_command += ARCAM_COMM_END

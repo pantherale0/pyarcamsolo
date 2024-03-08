@@ -6,6 +6,7 @@ from .commands import (
     ACCEPTED_ANSWER_CODES,
     COMMAND_CODES,
     POWER_STATUS_CODES,
+    CD_PLAYBACK_STATUS_CODES
 )
 
 def get_answer_code(ac: bytes) -> str:
@@ -16,7 +17,7 @@ def get_command_code(cc: bytes) -> str:
     """Return the command code from the byte."""
     return (list(COMMAND_CODES.keys())[list(COMMAND_CODES.values()).index(cc)])
 
-def parse_response(response: bytes) -> dict | None:
+def parse_response(response: bytes) -> dict | list[dict] | None:
     """Convert response bytes into a tuple for the main module to handle."""
     output = {
         "k": "",
@@ -72,9 +73,64 @@ def parse_response(response: bytes) -> dict | None:
     elif cc == "stby_display_brightness":
         output["k"] = "standby_display_brightness"
         output["v"] = data[0]
+    elif cc == "cd_playback_state":
+        output["k"] = cc
+        output["v"] = CD_PLAYBACK_STATUS_CODES.get(data, "Unknown")
+    elif cc == "cdusb_playback_time":
+        output["k"] = "current_track_position"
+        hour = int.from_bytes(data[0:1]) * 3600
+        minute = int.from_bytes(data[1:2]) * 60
+        sec = int.from_bytes(data[2:3])
+        output["v"] = hour+minute+sec
+    elif cc == "cdusb_current_track":
+        return parse_cdusb_current_track(
+            z=output["z"],
+            b=data
+        )
 
     return output if output["v"] is not None else None
 
+
+def parse_cdusb_current_track(z: int, b: bytes) -> list[dict]:
+    """Parse CD / USB Current Track info."""
+    current_folder = int.from_bytes(b[0:1])
+    total_folder = int.from_bytes(b[1:2])
+    msb_current_track = int.from_bytes(b[2:3])
+    lsb_current_track = int.from_bytes(b[3:4])
+    msb_total_track = int.from_bytes(b[4:5])
+    lsb_total_track = int.from_bytes(b[5:6])
+    return [
+        {
+            "k": "current_folder",
+            "v": current_folder,
+            "z": z
+        },
+        {
+            "k": "total_folder",
+            "v": total_folder,
+            "z": z
+        },
+        {
+            "k": "msb_current_track",
+            "v": msb_current_track,
+            "z": z
+        },
+        {
+            "k": "lsb_current_track",
+            "v": lsb_current_track,
+            "z": z
+        },
+        {
+            "k": "msb_total_track",
+            "v": msb_total_track,
+            "z": z
+        },
+        {
+            "k": "lsb_total_track",
+            "v": lsb_total_track,
+            "z": z
+        },
+    ]
 
 def bytes_to_int_with_offset(b: bytes, offset: int, normalizer, range_upper_limit: int):
     """Converts bytes to an int with a provided offset"""

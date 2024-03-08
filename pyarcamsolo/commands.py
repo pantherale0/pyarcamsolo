@@ -285,4 +285,28 @@ IR_COMMAND_CODES = {
         "system_code": 16,
         "command_code": 124
     },
+    "cd_play": {
+        "system_code": 20,
+        "command_code": 53
+    },
+    "cd_pause": {
+        "system_code": 20,
+        "command_code": 48
+    },
+    "cd_stop": {
+        "system_code": 20,
+        "command_code": 54
+    },
+    "cd_eject": {
+        "system_code": 20,
+        "command_code": 45
+    },
+    "cd_track_next": {
+        "system_code": 20,
+        "command_code": 32
+    },
+    "cd_track_previous": {
+        "system_code": 20,
+        "command_code": 33
+    },
 }
