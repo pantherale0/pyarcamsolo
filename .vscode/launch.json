@@ -11,7 +11,7 @@
             "program": "${cwd}/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--host=10.10.2.27", "--port=9800"]
+            "args": ["--host=192.168.1.180", "--port=2000"]
         }
     ]
 }

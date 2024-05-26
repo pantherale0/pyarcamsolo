@@ -101,17 +101,21 @@ class ArcamSolo:
     ) -> uuid.UUID | None:
         """Configure a zone callback."""
         if zone in self.zones:
+            self._zone_callbacks.setdefault(zone, {})
             if callback:
                 callback_id = uuid.uuid4()
-                self._zone_callbacks.setdefault(zone, {})
                 self._zone_callbacks[zone][callback_id] = callback
                 return callback_id
             elif callback_id:
-                self._zone_callbacks[zone].pop(callback_id)
-                return None
+                if callback_id in self._zone_callbacks[zone]:
+                    self._zone_callbacks[zone].pop(callback_id)
+                    return None
+                raise ValueError("Callback does not exist.")
             else:
-                self._zone_callbacks.pop(zone)
-                return None
+                if zone in self._zone_callbacks:
+                    self._zone_callbacks.pop(zone)
+                    return None
+                raise ValueError("Zone does not exist.")
 
     def _clear_zone_callbacks(self):
         """Clear any configured zone callbacks."""

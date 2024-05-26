@@ -46,7 +46,7 @@ async def main(argv):
     # await arcam.turn_on()
     while True:
         try:
-            # await arcam.send_ir_command("volume_plus")
+            await arcam.send_ir_command("volume_plus")
             await asyncio.sleep(10)
             for z in arcam.zones.items():
                 for a in z[1].items():
