@@ -99,6 +99,30 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
         minute = int.from_bytes(data[1:2]) * 60
         sec = int.from_bytes(data[2:3])
         output["v"] = hour+minute+sec
+    elif cc == "cdusb_total_track_time":
+        output["k"] = "current_track_duration"
+        hour = int.from_bytes(data[0:1]) * 3600
+        minute = int.from_bytes(data[1:2]) * 60
+        sec = int.from_bytes(data[2:3])
+        output["v"] = hour+minute+sec
+    elif cc == "cd_play_mode":
+        return [
+            {
+                "k": "repeat",
+                "v": None,
+                "z": output["z"]
+            },
+            {
+                "k": "shuffle",
+                "v": None,
+                "z": output["z"]
+            },
+            {
+                "k": "program",
+                "v": None,
+                "z": output["z"]
+            }
+        ]
     elif cc == "cdusb_current_track":
         return parse_cdusb_current_track(
             z=output["z"],

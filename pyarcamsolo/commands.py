@@ -311,4 +311,32 @@ IR_COMMAND_CODES = {
         "system_code": 20,
         "command_code": 33
     },
+    "cd_scan_back": {
+        "system_code": 20,
+        "command_code": 50
+    },
+    "cd_scan_forward": {
+        "system_code": 20,
+        "command_code": 52
+    },
+    "cd_repeat_off": {
+        "system_code": 20,
+        "command_code": 117
+    },
+    "cd_shuffle_on": {
+        "system_code": 20,
+        "command_code": 118
+    },
+    "cd_shuffle_off": {
+        "system_code": 20,
+        "command_code": 119
+    },
+    "cd_repeat_single": {
+        "system_code": 20,
+        "command_code": 116
+    },
+    "cd_repeat_all": {
+        "system_code": 20,
+        "command_code": 115
+    }
 }
