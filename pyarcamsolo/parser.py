@@ -123,9 +123,9 @@ def parse_radio_station_info(z: int, b: bytes) -> list[dict]:
         mhz = int.from_bytes(b[1:2])
         khz = int.from_bytes(b[2:3])
         if CURRENT_SOURCE == "AM":
-            val = str(mhz) + str(khz)
+            val = int(str(mhz).zfill(2) + str(khz).zfill(2))
         elif CURRENT_SOURCE == "FM":
-            val = int(str(mhz) + str(khz).zfill(2))/100
+            val = int(str(mhz).zfill(2) + str(khz).zfill(2))/100
         else:
             val = None
         return {
