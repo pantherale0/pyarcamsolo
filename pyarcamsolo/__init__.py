@@ -18,10 +18,12 @@ from .commands import (
     COMMAND_CODES,
     IR_COMMAND_CODES,
     SOURCE_IR_CONTROL_MAP,
-    ARCAM_QUERY_COMMANDS
+    ARCAM_QUERY_COMMANDS,
+    RADIO_QUERY_COMMANDS
 )
 from .util import sock_set_keepalive, cancel_task, get_backoff_delay, safe_wait_for
 from .parser import parse_response
+from .params import CONF_ENABLED_ZONES
 from ._version import __version__ as VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class ArcamSolo:
         port,
         timeout=2,
         scan_interval=60,
-        params=None):
+        params: dict | None=None):
         """Initialise the Arcam Solo interface."""
         _LOGGER.info("Starting pyarcamsolo %s", VERSION)
         _LOGGER.debug(
@@ -83,6 +85,11 @@ class ArcamSolo:
         self._initial_query = True
         # Stores a list of commands to run after receiving an event
         self._command_queue = []
+
+        # Handle configuration
+        self._enabled_zones = [1] # Zone 2 is optional
+        if params is not None:
+            self._enabled_zones = params.get(CONF_ENABLED_ZONES, [1]) # Zone 2 is optional
 
     def __del__(self):
         _LOGGER.debug(">> ArcamSolo.__del__()")
@@ -141,8 +148,9 @@ class ArcamSolo:
 
     def _set_updated_values(self, value):
         """Set updated values from response parser."""
-        _LOGGER.debug("parsed response %s", value)
+        _LOGGER.debug(">> ArcamSolo._set_updated_values(value=%s)")
         if value["z"] not in self.zones:
+            _LOGGER.debug("Zone does not yet exist so creating one.")
             self.zones[value["z"]] = {}
         self.zones[value["z"]][value["k"]] = value["v"]
         self._call_zone_callbacks(zone=value["z"])
@@ -174,7 +182,7 @@ class ArcamSolo:
                         for parsed in value:
                             self._set_updated_values(parsed)
                     elif isinstance(value, dict):
-                        self._set_updated_values(value)    
+                        self._set_updated_values(value)
                 else:
                     _LOGGER.debug("Ignoring response %s due to invalid data.", response.hex())
             except asyncio.CancelledError:
@@ -266,6 +274,7 @@ class ArcamSolo:
                     )
                     for zone in self.zones:
                         await self._update_zone(zone)
+                    await self._update_radio_data()
                 except Exception as exc: #pylint: disable=broad-except
                     _LOGGER.error(
                         "could not update Arcam status: %s: %s",
@@ -288,6 +297,25 @@ class ArcamSolo:
                 data=[b'\xF0'],
                 zone=zone
             )
+
+    async def _update_radio_data(self):
+        """Update radio status information."""
+        _LOGGER.debug(">> ArcamSolo._update_radio_data()")
+        if self.source in ["AM", "FM", "DAB"]:
+            for k, v in RADIO_QUERY_COMMANDS.items():
+                if (k=="request_station_frequency"
+                    and self.source not in ["AM", "FM"]):
+                    continue
+                if (k=="request_mpeg_mode" and self.source != "DAB"):
+                    continue
+                if (k=="request_data_rate" and self.source != "DAB"):
+                    continue
+                await self.send_raw_command(
+                    command="radio_station_info",
+                    data=[b'\xF0', v],
+                    zone=1
+                )
+
 
     async def _updater_schedule(self):
         """Schedule/reschedule the updater task."""
@@ -327,7 +355,7 @@ class ArcamSolo:
             await self._responder_cancel()
             await self._listener_schedule()
             await asyncio.sleep(0) # yield to listener task
-            await self.discover_zones([1, 2]) # discover zone 1 and 2
+            await self.discover_zones(self._enabled_zones) # discover zones
             await asyncio.sleep(2)
             await self._updater_schedule()
 
@@ -605,3 +633,10 @@ class ArcamSolo:
         await self.send_ir_command(
             command="standby_off"
         )
+
+    @property
+    def source(self) -> str | None:
+        """Return the current input source."""
+        if 1 not in self.zones:
+            return None
+        return self.zones.get(1).get("source", None)

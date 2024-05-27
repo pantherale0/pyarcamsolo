@@ -37,10 +37,17 @@ COMMAND_CODES = {
     "cd_disc_type": b'\xED',
     "time": b'\xF8',
     "rs232_version": b'\xF1',
-    "software_version": b'\xF2'
+    "software_version": b'\xF2',
 }
 
 ARCAM_QUERY_COMMANDS = list(COMMAND_CODES.keys())
+
+RADIO_QUERY_COMMANDS = {
+    "request_station_frequency": b'\x00', # fm/am
+    "request_station_signal": b'\x01', # all
+    "request_mpeg_mode": b'\x02', # dab only
+    "request_data_rate": b'\x03' # dab only
+}
 
 ACCEPTED_ANSWER_CODES = ["status_update", "command_accepted_completed"]
 ANSWER_CODES = {
@@ -130,6 +137,13 @@ USB_PLAYBACK_STATUS_CODES = {
     b'\x10': "Invalid File",
     b'\x11': "No Valid Files Present",
     b'\x0D': "Track Skipping"
+}
+
+RADIO_MPEG_MODES = {
+    b'\x00': "Stereo",
+    b'\x01': "Joint Stereo",
+    b'\x02': "Dual Mono",
+    b'\x03': "Mono"
 }
 
 IR_COMMAND_CODES = {

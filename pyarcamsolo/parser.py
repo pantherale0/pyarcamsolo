@@ -1,13 +1,20 @@
 """Arcam Parser Helper."""
 
+import logging
+
 from .commands import (
     SOURCE_SELECTION_CODES,
     ANSWER_CODES,
     ACCEPTED_ANSWER_CODES,
     COMMAND_CODES,
     POWER_STATUS_CODES,
-    CD_PLAYBACK_STATUS_CODES
+    CD_PLAYBACK_STATUS_CODES,
+    RADIO_QUERY_COMMANDS,
+    RADIO_MPEG_MODES
 )
+
+_LOGGER = logging.getLogger(__name__)
+CURRENT_SOURCE = ""
 
 def get_answer_code(ac: bytes) -> str:
     """Return the answer code from the byte."""
@@ -17,8 +24,13 @@ def get_command_code(cc: bytes) -> str:
     """Return the command code from the byte."""
     return (list(COMMAND_CODES.keys())[list(COMMAND_CODES.values()).index(cc)])
 
+def get_radio_query_code(d1: bytes) -> str:
+    """Return the command name from the byte."""
+    return (list(RADIO_QUERY_COMMANDS.keys())[list(RADIO_QUERY_COMMANDS.values()).index(d1)])
+
 def parse_response(response: bytes) -> dict | list[dict] | None:
     """Convert response bytes into a tuple for the main module to handle."""
+    global CURRENT_SOURCE
     output = {
         "k": "",
         "v": None,
@@ -32,8 +44,12 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
     data = response[5:(5+size)] # Sixth byte+ is data
 
     cc = get_command_code(cc)
+    ac = get_answer_code(ac)
     # check answer code is valid
-    if get_answer_code(ac) not in ACCEPTED_ANSWER_CODES:
+    if ac not in ACCEPTED_ANSWER_CODES:
+        if ac == "command_invalid_at_this_time":
+            _LOGGER.warning("Command %s is unavailable in current state. Will retry later.", cc)
+            return None
         raise ValueError(
             f"Provided response for {cc} is invalid at this time: {get_answer_code(ac)}"
         )
@@ -47,6 +63,7 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
     elif cc == "source":
         output["k"] = "source"
         output["v"] = SOURCE_SELECTION_CODES.get(data)
+        CURRENT_SOURCE = output["v"]
     elif cc == "status":
         output["k"] = "power"
         output["v"] = POWER_STATUS_CODES.get(data)
@@ -87,9 +104,54 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
             z=output["z"],
             b=data
         )
+    elif cc == "radio_station_info":
+        return parse_radio_station_info(
+            z=output["z"],
+            b=data
+        )
+    elif cc == "radio_station":
+        output["k"] = "radio_station"
+        output["v"] = data.decode("ascii")
 
     return output if output["v"] is not None else None
 
+def parse_radio_station_info(z: int, b: bytes) -> list[dict]:
+    """Parse radio ration information."""
+    global CURRENT_SOURCE
+    d1 = get_radio_query_code(b[0:1])
+    if d1 == "request_station_frequency":
+        mhz = int.from_bytes(b[1:2])
+        khz = int.from_bytes(b[2:3])
+        if CURRENT_SOURCE == "AM":
+            val = str(mhz) + str(khz)
+        elif CURRENT_SOURCE == "FM":
+            val = int(str(mhz) + str(khz).zfill(2))/100
+        else:
+            val = None
+        return {
+            "k": "radio_frequency",
+            "v": val,
+            "z": z
+        }
+    elif d1 == "request_station_signal":
+        return {
+            "k": "radio_signal",
+            "v": int.from_bytes(b[1:2]),
+            "z": z
+        }
+    elif d1 == "request_mpeg_mode":
+        return {
+            "k": "dab_mpeg_mode",
+            "v": RADIO_MPEG_MODES.get(b[1:2], None),
+            "z": z
+        }
+    elif d1 == "request_data_rate":
+        return {
+            "k": "dab_data_rate",
+            "v": int.from_bytes(b[1:2]),
+            "z": z
+        }
+    return None
 
 def parse_cdusb_current_track(z: int, b: bytes) -> list[dict]:
     """Parse CD / USB Current Track info."""

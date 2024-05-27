@@ -46,11 +46,11 @@ async def main(argv):
     # await arcam.turn_on()
     while True:
         try:
-            await arcam.send_ir_command("volume_plus")
+            # await arcam.send_ir_command("volume_plus")
             await asyncio.sleep(10)
-            for z in arcam.zones.items():
-                for a in z[1].items():
-                    print(f"{z[0]}: {a[0]} - {a[1]}")
+            # for z in arcam.zones.items():
+                # for a in z[1].items():
+                #     print(f"{z[0]}: {a[0]} - {a[1]}")
         except KeyboardInterrupt:
             # await arcam.turn_off()
             await asyncio.sleep(5)
