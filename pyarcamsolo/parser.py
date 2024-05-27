@@ -79,12 +79,10 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
         output["v"] = (data[0])-100
     elif cc == "bass":
         output["k"] = cc
-        output["v"] = bytes_to_int_with_offset(data[0], 2, 0x5D,
-                                               range_upper_limit=14)
+        output["v"] = (int.from_bytes(data[0:])-100)*2
     elif cc == "treble":
         output["k"] = cc
-        output["v"] = bytes_to_int_with_offset(data[0], 2, 0x5D,
-                                               range_upper_limit=14)
+        output["v"] = (int.from_bytes(data[0:])-100)*2
     elif cc == "display_brightness":
         output["k"] = cc
         output["v"] = data[0]
@@ -242,13 +240,3 @@ def parse_cdusb_current_track(z: int, b: bytes) -> list[dict]:
             "z": z
         },
     ]
-
-def bytes_to_int_with_offset(b: bytes, offset: int, normalizer, range_upper_limit: int):
-    """Converts bytes to an int with a provided offset"""
-    i = int.from_bytes(b, byteorder='big', signed=True)
-    # apply a base range from a normalizer
-    i -= normalizer
-    # now apply scaling using the offset provided
-    i *= offset
-    i -= range_upper_limit
-    return i

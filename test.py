@@ -48,9 +48,9 @@ async def main(argv):
         try:
             # await arcam.send_ir_command("cd_repeat_all")
             # await asyncio.sleep(2)
-            await arcam.send_ir_command("cd_shuffle_on")
-            await asyncio.sleep(2)
-            await arcam.send_ir_command("cd_shuffle_off")
+            #await arcam.send_ir_command("cd_shuffle_on")
+            #await asyncio.sleep(2)
+            #await arcam.send_ir_command("cd_shuffle_off")
             # await asyncio.sleep(2)
             # await arcam.send_ir_command("cd_repeat_off")
             await asyncio.sleep(10)
