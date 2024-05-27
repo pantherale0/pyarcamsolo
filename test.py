@@ -46,7 +46,13 @@ async def main(argv):
     # await arcam.turn_on()
     while True:
         try:
-            # await arcam.send_ir_command("volume_plus")
+            # await arcam.send_ir_command("cd_repeat_all")
+            # await asyncio.sleep(2)
+            await arcam.send_ir_command("cd_shuffle_on")
+            await asyncio.sleep(2)
+            await arcam.send_ir_command("cd_shuffle_off")
+            # await asyncio.sleep(2)
+            # await arcam.send_ir_command("cd_repeat_off")
             await asyncio.sleep(10)
             # for z in arcam.zones.items():
                 # for a in z[1].items():

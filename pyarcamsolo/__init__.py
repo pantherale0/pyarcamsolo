@@ -148,7 +148,7 @@ class ArcamSolo:
 
     def _set_updated_values(self, value):
         """Set updated values from response parser."""
-        _LOGGER.debug(">> ArcamSolo._set_updated_values(value=%s)")
+        _LOGGER.debug(">> ArcamSolo._set_updated_values(value=%s)", value)
         if value["z"] not in self.zones:
             _LOGGER.debug("Zone does not yet exist so creating one.")
             self.zones[value["z"]] = {}
@@ -358,6 +358,7 @@ class ArcamSolo:
             await self.discover_zones(self._enabled_zones) # discover zones
             await asyncio.sleep(2)
             await self._updater_schedule()
+            await asyncio.sleep(5) # allow initial queries to complete
 
         _LOGGER.debug(">> ArcamSolo.connect() completed")
 
@@ -541,9 +542,11 @@ class ArcamSolo:
                                rate_limit=True):
         """Send a raw command to the Arcam."""
         _LOGGER.debug(
-            '>> ArcamSolo.send_raw_command("%s", rate_limit=%s)',
+            '>> ArcamSolo.send_raw_command(command=%s, rate_limit=%s, zone=%s, data=%s)',
             command,
             rate_limit,
+            zone,
+            data
         )
         if not self.available:
             raise RuntimeError("AVR connection not available")
@@ -576,6 +579,7 @@ class ArcamSolo:
     async def send_ir_command(self,
                               command: str):
         """Send an IR command to the Arcam."""
+        _LOGGER.debug(">> ArcamSolo.send_ir_command(command=%s)", command)
         ir_data = IR_COMMAND_CODES.get(command, None)
         if ir_data is None:
             raise ValueError("Command does not exist.")

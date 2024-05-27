@@ -53,6 +53,7 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
         raise ValueError(
             f"Provided response for {cc} is invalid at this time: {get_answer_code(ac)}"
         )
+    _LOGGER.debug(">> Decoded response as command %s", cc)
 
     if cc == "volume":
         output["k"] = cc
@@ -106,20 +107,44 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
         sec = int.from_bytes(data[2:3])
         output["v"] = hour+minute+sec
     elif cc == "cd_play_mode":
+        binary = bin(int(data.hex(), 16))[2:]
+        if len(binary) == 4:
+            shuffle_value = int(binary[1])
+            repeat_value = binary[2:4]
+            program_value = int(binary[0])
+        elif len(binary) == 3:
+            shuffle_value = int(binary[0])
+            repeat_value = binary[1:3]
+            program_value = "0"
+        elif len(binary) == 2:
+            repeat_value = binary[0:1]
+            program_value = 0
+            shuffle_value = 0
+        else:
+            repeat_value = "0"
+            program_value = 0
+            shuffle_value = 0
+        # sort repeat value properly
+        if repeat_value == "0":
+            repeat_value = "off"
+        elif repeat_value == "1":
+            repeat_value = "single"
+        elif repeat_value == "11":
+            repeat_value = "all"
         return [
             {
                 "k": "repeat",
-                "v": None,
+                "v": repeat_value,
                 "z": output["z"]
             },
             {
                 "k": "shuffle",
-                "v": None,
+                "v": bool(shuffle_value),
                 "z": output["z"]
             },
             {
                 "k": "program",
-                "v": None,
+                "v": bool(program_value),
                 "z": output["z"]
             }
         ]
