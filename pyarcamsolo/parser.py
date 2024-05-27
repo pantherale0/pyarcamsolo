@@ -159,6 +159,12 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
     elif cc == "radio_station":
         output["k"] = "radio_station"
         output["v"] = data.decode("ascii")
+    elif cc == "snooze" or cc == "sleep":
+        output["k"] = cc
+        output["v"] = int.from_bytes(data[0:])
+    elif cc == "headphones":
+        output["k"] = cc
+        output["v"] = bool(int.from_bytes(data[0:]))
 
     return output if output["v"] is not None else None
 
