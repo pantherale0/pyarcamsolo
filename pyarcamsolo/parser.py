@@ -48,7 +48,7 @@ def parse_response(response: bytes) -> dict | list[dict] | None:
     # check answer code is valid
     if ac not in ACCEPTED_ANSWER_CODES:
         if ac == "command_invalid_at_this_time":
-            _LOGGER.warning("Command %s is unavailable in current state. Will retry later.", cc)
+            _LOGGER.debug("Command %s is unavailable in current state. Will retry later.", cc)
             return None
         raise ValueError(
             f"Provided response for {cc} is invalid at this time: {get_answer_code(ac)}"

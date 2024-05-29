@@ -329,10 +329,10 @@ class ArcamSolo:
         """Open a connection to the Hi-Fi and start listener thread."""
         _LOGGER.debug(">> ArcamSolo.connect() started")
         if self._connect_lock.locked():
-            _LOGGER.warning("Connection is already in progress, skipping connect.")
+            _LOGGER.debug("Connection is already in progress, skipping connect.")
             return
         if self.available:
-            _LOGGER.warning("Device is connected, skipping connection.")
+            _LOGGER.debug("Device is connected, skipping connection.")
             return
 
         async with self._connect_lock:
@@ -367,12 +367,12 @@ class ArcamSolo:
         _LOGGER.debug(">> ArcamSolo.disconnect() started")
 
         if self._disconnect_lock.locked():
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Arcam connection is already disconnecting, skipping disconnect"
             )
             return
         if not self.available:
-            _LOGGER.warning("Arcam not connected, skipping disconnect")
+            _LOGGER.debug("Arcam not connected, skipping disconnect")
             return
 
         async with self._disconnect_lock:
@@ -452,8 +452,6 @@ class ArcamSolo:
                 _LOGGER.info("reconnecting to ArcamSolo")
                 reconnect_task = asyncio.create_task(self.reconnect())
                 self._reconnect_task = reconnect_task
-            else:
-                _LOGGER.error("ArcamSolo listener reconnection already running")
 
     async def _reconnect_cancel(self):
         """Cancel any active reconnect task."""
