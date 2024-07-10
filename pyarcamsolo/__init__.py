@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from collections.abc import Callable
 from inspect import isfunction
+import serial_asyncio_fast as serial_asyncio
 
 from .commands import (
     ARCAM_COMM_END,
@@ -23,7 +24,7 @@ from .commands import (
 )
 from .util import sock_set_keepalive, cancel_task, get_backoff_delay, safe_wait_for
 from .parser import parse_response
-from .params import CONF_ENABLED_ZONES
+from .params import CONF_ENABLED_ZONES, CONF_USE_LOCAL_SERIAL
 from ._version import __version__ as VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,7 +52,6 @@ class ArcamSolo:
         self._port = port
         self._timeout = timeout
         self.scan_interval = scan_interval
-
         # Public props
         self.software_version = None
         self.available = False
@@ -88,8 +88,10 @@ class ArcamSolo:
 
         # Handle configuration
         self._enabled_zones = [1] # Zone 2 is optional
+        self._use_local_serial = False
         if params is not None:
             self._enabled_zones = params.get(CONF_ENABLED_ZONES, [1]) # Zone 2 is optional
+            self._use_local_serial = params.get(CONF_USE_LOCAL_SERIAL, False)
 
     def __del__(self):
         _LOGGER.debug(">> ArcamSolo.__del__()")
@@ -118,11 +120,6 @@ class ArcamSolo:
                     self._zone_callbacks[zone].pop(callback_id)
                     return None
                 raise ValueError("Callback does not exist.")
-            else:
-                if zone in self._zone_callbacks:
-                    self._zone_callbacks.pop(zone)
-                    return None
-                raise ValueError("Zone does not exist.")
 
     def _clear_zone_callbacks(self):
         """Clear any configured zone callbacks."""
@@ -341,10 +338,16 @@ class ArcamSolo:
                 raise RuntimeError("Device already connected.")
 
             # open a connection
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(self._host, self._port),
-                timeout=self._timeout
-            )
+            if self._use_local_serial:
+                reader, writer = await serial_asyncio.open_serial_connection(
+                    url=self._host,
+                    baudrate=self._port
+                )
+            else:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(self._host, self._port),
+                    timeout=self._timeout
+                )
             _LOGGER.info("Device connection established.")
             self._reader = reader
             self._writer = writer

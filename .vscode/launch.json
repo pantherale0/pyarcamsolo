@@ -11,7 +11,7 @@
             "program": "${cwd}/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--host=192.168.1.180", "--port=2000"]
+            "args": ["--host=/dev/ttyUSB0", "--port=38400", "--local=1"]
         }
     ]
 }

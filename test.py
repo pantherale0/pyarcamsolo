@@ -7,7 +7,7 @@ import logging
 import sys
 import getopt
 
-from pyarcamsolo import ArcamSolo
+from pyarcamsolo import ArcamSolo, CONF_USE_LOCAL_SERIAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,8 +17,9 @@ async def main(argv):
     _LOGGER.debug(">> main()")
 
     host = ""
+    loc = False
     try:
-        opts, _ = getopt.getopt(argv, "hp:v", ["host=", "port="])
+        opts, _ = getopt.getopt(argv, "hpl:v", ["host=", "port=", "local="])
     except getopt.GetoptError:
         sys.exit(2)
     for opt, arg in opts:
@@ -26,6 +27,8 @@ async def main(argv):
             host = arg
         if opt in ("-p", "--port"):
             port = arg
+        if opt in ("-l", "--local"):
+            loc = True
 
     if host == "" or port == "":
         _LOGGER.fatal("Host or port not specified.")
@@ -33,7 +36,10 @@ async def main(argv):
 
     arcam = ArcamSolo(
         host=host,
-        port=int(port)
+        port=int(port),
+        params={
+            CONF_USE_LOCAL_SERIAL: loc
+        }
     )
 
     try:

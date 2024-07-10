@@ -14,6 +14,8 @@ with open('pyarcamsolo/_version.py', 'r', encoding='utf8') as version_file:
         raise RuntimeError('Unable to find version string!')
 
 REQUIREMENTS = [
+    "pyserial-asyncio-fast == 0.*",
+    "pyserial == 3.*"
 ]
 
 DEV_REQUIREMENTS = [
