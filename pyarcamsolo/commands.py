@@ -163,6 +163,15 @@ IR_COMMAND_CODES = {
         "system_code": 16,
         "command_code": 5
     },
+    "src_game": {
+        "system_code": 16,
+        "command_code": 6
+    },
+    "src_usb": {
+        "system_code": 16,
+        "command_code": 8,
+        "repeat": 2
+    },
     "src_cd": {
         "system_code": 16,
         "command_code": 7

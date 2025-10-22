@@ -584,6 +584,17 @@ class ArcamSolo:
         ir_data = IR_COMMAND_CODES.get(command, None)
         if ir_data is None:
             raise ValueError("Command does not exist.")
+        if "repeat" in ir_data:
+            for _ in range(ir_data["repeat"]):
+                await self.send_raw_command(
+                    command="virtual_remote",
+                    data=[
+                        ir_data["system_code"].to_bytes(1, 'little'),
+                        ir_data["command_code"].to_bytes(1, 'little')
+                    ]
+                )
+                await asyncio.sleep(0.1)
+            return
         await self.send_raw_command(
             command="virtual_remote",
             data=[
