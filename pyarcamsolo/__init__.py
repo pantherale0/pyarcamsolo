@@ -4,14 +4,11 @@
 import asyncio
 import time
 import logging
-import re
-import math
 import uuid
 
 from datetime import datetime
 from collections.abc import Callable
-from inspect import isfunction
-import serial_asyncio_fast as serial_asyncio
+import serialx
 
 from .commands import (
     ARCAM_COMM_END,
@@ -22,9 +19,9 @@ from .commands import (
     ARCAM_QUERY_COMMANDS,
     RADIO_QUERY_COMMANDS
 )
-from .util import sock_set_keepalive, cancel_task, get_backoff_delay, safe_wait_for
+from .util import cancel_task, get_backoff_delay, safe_wait_for
 from .parser import parse_response
-from .params import CONF_ENABLED_ZONES, CONF_USE_LOCAL_SERIAL
+from .params import CONF_ENABLED_ZONES
 from ._version import __version__ as VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,22 +31,21 @@ class ArcamSolo:
 
     def __init__(
         self,
-        host,
-        port,
+        uri: str,
         timeout=2,
+        baudrate=38400,
         scan_interval=60,
         params: dict | None=None):
         """Initialise the Arcam Solo interface."""
         _LOGGER.info("Starting pyarcamsolo %s", VERSION)
         _LOGGER.debug(
-            '>> ArcamSolo.__init__(host="%s", port="%s", timeout="%s", params="%s")',
-            host,
-            port,
+            '>> ArcamSolo.__init__(uri="%s", timeout="%s", params="%s")',
+            uri,
             timeout,
             params
         )
-        self._host = host
-        self._port = port
+        self._uri = uri
+        self._baudrate = baudrate
         self._timeout = timeout
         self.scan_interval = scan_interval
         # Public props
@@ -88,22 +84,11 @@ class ArcamSolo:
 
         # Handle configuration
         self._enabled_zones = [1] # Zone 2 is optional
-        self._use_local_serial = False
         if params is not None:
             self._enabled_zones = params.get(CONF_ENABLED_ZONES, [1]) # Zone 2 is optional
-            self._use_local_serial = params.get(CONF_USE_LOCAL_SERIAL, False)
 
     def __del__(self):
         _LOGGER.debug(">> ArcamSolo.__del__()")
-
-    def _set_socket_options(self):
-        """Set socket keepalive options."""
-        sock_set_keepalive(
-            self._writer.get_extra_info("socket"),
-            after_idle_sec=int(self._timeout),
-            interval_sec=int(self._timeout),
-            max_fails=3,
-        )
 
     def set_zone_callback(
         self, zone: int, callback_id: uuid.UUID = None, callback: Callable[..., None] | None = None
@@ -136,7 +121,7 @@ class ArcamSolo:
     @property
     def get_unique_id(self):
         """Return a unique ID."""
-        return f"{self._host}:{self._port}"
+        return f"{self._uri}"
 
     async def _responder_cancel(self):
         """Cancel any active responder task."""
@@ -337,23 +322,17 @@ class ArcamSolo:
             if self._writer is not None:
                 raise RuntimeError("Device already connected.")
 
-            # open a connection
-            if self._use_local_serial:
-                reader, writer = await serial_asyncio.open_serial_connection(
-                    url=self._host,
-                    baudrate=self._port
-                )
-            else:
-                reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self._host, self._port),
-                    timeout=self._timeout
-                )
+            reader, writer = await asyncio.wait_for(
+                await serialx.open_serial_connection(
+                    url=self._uri,
+                    baudrate=self._baudrate
+                ),
+            timeout=self._timeout)
             _LOGGER.info("Device connection established.")
             self._reader = reader
             self._writer = writer
             self.available = True
             self._reconnect = reconnect
-            self._set_socket_options()
 
             await self._responder_cancel()
             await self._listener_schedule()
