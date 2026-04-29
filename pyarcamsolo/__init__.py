@@ -33,6 +33,7 @@ class ArcamSolo:
         self,
         uri: str,
         timeout=2,
+        baudrate=38400,
         scan_interval=60,
         params: dict | None=None):
         """Initialise the Arcam Solo interface."""
@@ -44,6 +45,7 @@ class ArcamSolo:
             params
         )
         self._uri = uri
+        self._baudrate = baudrate
         self._timeout = timeout
         self.scan_interval = scan_interval
         # Public props
@@ -320,10 +322,12 @@ class ArcamSolo:
             if self._writer is not None:
                 raise RuntimeError("Device already connected.")
 
-            reader, writer = await serialx.open_serial_connection(
-                url=self._uri,
-                baudrate=38400
-            )
+            reader, writer = await asyncio.wait_for(
+                await serialx.open_serial_connection(
+                    url=self._uri,
+                    baudrate=self._baudrate
+                ),
+            timeout=self._timeout)
             _LOGGER.info("Device connection established.")
             self._reader = reader
             self._writer = writer
