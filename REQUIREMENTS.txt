@@ -1,2 +1,1 @@
-pyserial
-pyserial-asyncio-fast == 0.13
+serialx
