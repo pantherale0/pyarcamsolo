@@ -11,7 +11,7 @@
             "program": "${cwd}/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--host=/dev/ttyUSB0", "--port=38400", "--local=1"]
+            "args": ["--uri=socket://10.10.50.156:38400"]
         }
     ]
 }

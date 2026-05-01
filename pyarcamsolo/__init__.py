@@ -322,12 +322,11 @@ class ArcamSolo:
             if self._writer is not None:
                 raise RuntimeError("Device already connected.")
 
-            reader, writer = await asyncio.wait_for(
-                await serialx.open_serial_connection(
+            reader, writer = await serialx.open_serial_connection(
                     url=self._uri,
-                    baudrate=self._baudrate
-                ),
-            timeout=self._timeout)
+                    baudrate=self._baudrate,
+                    timeout=self._timeout
+                )
             _LOGGER.info("Device connection established.")
             self._reader = reader
             self._writer = writer
